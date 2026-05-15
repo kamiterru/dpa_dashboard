@@ -2,15 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignupPage() {
+  const router = useRouter()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -32,31 +33,15 @@ export default function SignupPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      setSuccess(true)
+      router.push('/pending')
     }
-  }
-
-  if (success) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-        <div className="text-green-600 text-4xl mb-4">✓</div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-2">Check your email</h2>
-        <p className="text-sm text-slate-600">
-          We sent a confirmation link to <strong>{email}</strong>. Click it to activate your
-          account. New accounts are read-only by default — an admin can upgrade your access.
-        </p>
-        <Link href="/login" className="mt-6 inline-block text-sm text-blue-600 hover:underline">
-          Back to sign in
-        </Link>
-      </div>
-    )
   }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
       <h2 className="text-xl font-semibold text-slate-900 mb-2">Create an account</h2>
       <p className="text-sm text-slate-500 mb-6">
-        New accounts are read-only. An admin will need to grant additional access.
+        Your account will be reviewed by an admin before you can access the dashboard.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
