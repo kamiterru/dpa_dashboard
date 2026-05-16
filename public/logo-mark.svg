@@ -1,0 +1,6 @@
+<svg viewBox="0 0 56 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange top shape -->
+  <polygon points="0,16 42,0 52,28 10,44" fill="#FF6600"/>
+  <!-- Lime bottom-right shape -->
+  <polygon points="14,46 52,30 56,44 18,50" fill="#CCEE00"/>
+</svg>

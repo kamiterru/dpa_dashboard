@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -38,15 +39,7 @@ export function Sidebar({ userRole }: { userRole?: string }) {
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
           {/* Logo mark */}
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="flex-shrink-0" aria-hidden="true">
-            <polygon points="4,4 24,14 4,24" fill="url(#logo-grad)" />
-            <defs>
-              <linearGradient id="logo-grad" x1="4" y1="4" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#fbbf24" />
-                <stop offset="100%" stopColor="#f97316" />
-              </linearGradient>
-            </defs>
-          </svg>
+          <Image src="/logo-mark.svg" alt="Logo" width={28} height={25} className="flex-shrink-0" />
           <p className="font-poppins text-base font-semibold text-slate-400 tracking-wide">
             DPA Dashboard
           </p>
