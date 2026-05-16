@@ -2,23 +2,32 @@ interface Props {
   status: string | null
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  Compliant: 'bg-green-100 text-green-800',
-  Complies: 'bg-green-100 text-green-800',
-  'Not Compliant': 'bg-red-100 text-red-800',
-  'Not Complies': 'bg-red-100 text-red-800',
-  Unclear: 'bg-amber-100 text-amber-800',
-  'Not Assessed': 'bg-slate-100 text-slate-600',
-  Failed: 'bg-red-200 text-red-900',
+// Colours taken directly from status_pill Figma component
+const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  Compliant:       { bg: '#cdfbdd', color: '#166534', label: 'Compliant' },
+  Complies:        { bg: '#cdfbdd', color: '#166534', label: 'Compliant' },
+  'Not Compliant': { bg: '#ffd7d7', color: '#dd2222', label: 'Not compliant' },
+  'Not Complies':  { bg: '#ffd7d7', color: '#dd2222', label: 'Not compliant' },
+  Unclear:         { bg: '#fef3c7', color: '#d97706', label: 'Unclear' },
+  'Not Assessed':  { bg: '#efefef', color: '#536072', label: 'Not assessed' },
+  Failed:          { bg: '#ffd7d7', color: '#dd2222', label: 'Failed' },
 }
 
-export function StatusBadge({ status }: Props) {
-  const label = status ?? 'Not Assessed'
-  const styles = STATUS_STYLES[label] ?? 'bg-slate-100 text-slate-600'
+const DEFAULT_STYLE = { bg: '#efefef', color: '#536072', label: 'Not assessed' }
 
+export function StatusBadge({ status }: Props) {
+  const s = STATUS_STYLES[status ?? ''] ?? DEFAULT_STYLE
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${styles}`}>
-      {label}
+    <span
+      className="inline-flex items-center px-3 py-1 text-xs font-semibold font-inter"
+      style={{
+        backgroundColor: s.bg,
+        color: s.color,
+        borderRadius: '6px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {s.label}
     </span>
   )
 }

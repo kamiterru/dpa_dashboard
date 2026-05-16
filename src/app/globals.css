@@ -3,9 +3,17 @@
 html,
 body {
   height: 100%;
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   color: #1e293b;
   background: #f8fafc;
+}
+
+.font-poppins {
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-inter {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Shared input / select / textarea style used across the dashboard */

@@ -12,11 +12,12 @@ const NAV_ITEMS = [
   { label: 'Requested', href: '/records?filter=requested', filter: 'requested' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ userRole }: { userRole?: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentFilter = searchParams.get('filter')
   const router = useRouter()
+  const isAdmin = userRole === 'admin'
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -26,43 +27,69 @@ export function Sidebar() {
   }
 
   function isActive(item: typeof NAV_ITEMS[0]) {
-    if (item.filter === null) {
-      return pathname === '/records' && !currentFilter
-    }
+    if (item.filter === null) return pathname === '/records' && !currentFilter
     return pathname === '/records' && currentFilter === item.filter
   }
 
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-slate-900 text-slate-100">
+    <aside className="flex flex-col w-64 min-h-screen bg-[#0f172a] text-slate-100 flex-shrink-0">
+
+      {/* Logo / brand */}
       <div className="px-6 py-5 border-b border-slate-800">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">DPA Dashboard</p>
+        <div className="flex items-center gap-3">
+          {/* Logo mark — orange/yellow accent square */}
+          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex-shrink-0" />
+          <p className="font-poppins text-base font-semibold text-slate-400 tracking-wide">
+            DPA Dashboard
+          </p>
+        </div>
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        <p className="px-3 py-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
+        <p className="px-3 py-1 font-poppins text-xs font-semibold uppercase tracking-widest text-[#64748b]">
           Records
         </p>
         {NAV_ITEMS.map(item => (
           <Link
             key={item.label}
             href={item.href}
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center rounded-lg px-3 py-2 font-poppins text-sm font-medium transition-colors ${
               isActive(item)
-                ? 'bg-slate-700 text-white'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-[#334155] text-white'
+                : 'text-[#cbd5e1] hover:bg-slate-800 hover:text-white'
             }`}
           >
             {item.label}
           </Link>
         ))}
+
+        {isAdmin && (
+          <>
+            <p className="px-3 pt-4 pb-1 font-poppins text-xs font-semibold uppercase tracking-widest text-[#64748b]">
+              Admin
+            </p>
+            <Link
+              href="/admin/users"
+              className={`flex items-center rounded-lg px-3 py-2 font-poppins text-sm font-medium transition-colors ${
+                pathname.startsWith('/admin')
+                  ? 'bg-[#334155] text-white'
+                  : 'text-[#cbd5e1] hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              Users
+            </Link>
+          </>
+        )}
       </nav>
 
+      {/* Sign out */}
       <div className="px-3 py-4 border-t border-slate-800">
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors text-left"
+          className="w-full rounded-lg px-3 py-2 font-poppins text-sm font-semibold text-[#0f172a] bg-[#b2f9fb] hover:bg-[#9ff0f2] transition-colors text-center"
         >
-          Sign out
+          Sign Out
         </button>
       </div>
     </aside>
