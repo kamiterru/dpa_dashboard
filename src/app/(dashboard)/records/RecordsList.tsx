@@ -167,7 +167,7 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
       {/* Table */}
       <div className="bg-white rounded-[8px] border border-[#e6e8eb] overflow-hidden shadow-sm">
         {/* Header */}
-        <div className="grid grid-cols-[minmax(160px,_219fr)_minmax(200px,_300fr)_100px_120px_100px_140px] border-b border-[#f8fafc] bg-[#f8fafc] px-6 py-3 items-center">
+        <div className="grid grid-cols-[minmax(128px,_175fr)_minmax(180px,_270fr)_110px_130px_110px_140px] border-b border-[#f8fafc] bg-[#f8fafc] px-6 py-3 items-center gap-4">
           {/* NAME — sortable */}
           <button
             onClick={() => toggleSort('name')}
@@ -177,9 +177,9 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
             <SortIcon field="name" active={sortField === 'name'} dir={sortDir} />
           </button>
           <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Products</span>
-          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider text-right">DPA Date</span>
+          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">DPA Date</span>
           <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Status</span>
-          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider text-right">Published</span>
+          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Published</span>
           {/* LAST CHECKED — sortable */}
           <button
             onClick={() => toggleSort('last_checked')}
@@ -196,7 +196,7 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
           <div
             key={row.org_id}
             onClick={() => row.doc_id && router.push(`/records/${row.doc_id}`)}
-            className={`grid grid-cols-[minmax(160px,_219fr)_minmax(200px,_300fr)_100px_120px_100px_140px] px-6 py-4 border-b border-[#f8fafc] bg-white items-center gap-2 transition-colors ${
+            className={`grid grid-cols-[minmax(128px,_175fr)_minmax(180px,_270fr)_110px_130px_110px_140px] px-6 py-4 border-b border-[#f8fafc] bg-white items-center gap-4 transition-colors ${
               row.doc_id ? 'cursor-pointer hover:bg-slate-50' : ''
             }`}
           >
@@ -214,14 +214,14 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
             </span>
 
             {/* DPA date */}
-            <span className="font-inter text-sm text-[#536072] text-right">{fmt(row.dpa_date)}</span>
+            <span className="font-inter text-sm text-[#536072]">{fmt(row.dpa_date)}</span>
 
             {/* Status pill */}
             <div><StatusBadge status={row.current_status} /></div>
 
             {/* Published */}
             <span
-              className={`font-inter text-sm font-medium text-right ${row.published ? 'text-[#16a34a]' : 'text-[#64748b] font-light'}`}
+              className={`font-inter text-sm font-medium ${row.published ? 'text-[#16a34a]' : 'text-[#64748b] font-light'}`}
             >
               {row.published ? 'Live' : 'Draft'}
             </span>
