@@ -1,6 +1,9 @@
-<svg viewBox="0 0 56 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Orange top shape -->
-  <polygon points="0,16 42,0 52,28 10,44" fill="#FF6600"/>
-  <!-- Lime bottom-right shape -->
-  <polygon points="14,46 52,30 56,44 18,50" fill="#CCEE00"/>
+<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<rect width="28" height="28" fill="url(#pattern0_370_779)"/>
+<defs>
+<pattern id="pattern0_370_779" patternContentUnits="objectBoundingBox" width="1" height="1">
+<use xlink:href="#image0_370_779" transform="scale(0.00917431)"/>
+</pattern>
+<image id="image0_370_779" width="109" height="109" preserveAspectRatio="none" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAG0AAABtCAYAAACr+O9WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAALsSURBVHgB7dw7apVRFIbhfUTw1hghNtpELdQRpNQmvegAMgRnkDgChyCOxNRWzsAyhUICgkWK/J4vmEOSdS7/ZV/Wgvdt9u4fWMVmsWfJcd1B+jI/9hMtOtl9mmbJaYDZBHa6+8QnGmC2SzDlDg0w21Uw5QoNMNtNMOUGDTDbMjDlAg0w2yow1RwNMNs6MNUUDTDbJjDVDA0wWx8w1QQNMFtfMFUdDTDbEDBVFQ0w21AwVQ0NMNsYMHUrVWgO9jkBdq0/r7dHganiaN2ndDA/PiZaJLDfe8/S2IqOxwuw83SYaNFUMFUMDTBbDjBVBA0wWy4wlR0NMFtOMJUVDTBbbjCVDQ0wWwkwlQUNMFspMDUZDTBbSTA1CQ0wW2kwNRoNMFsNMDUKDTBbLTA1+O0RMNvf54+qgalBaIDZzrbvp197O6lmvccjYDaBHX94lc7v3E4164UGmK0VmNqIBpitJZhaiwaYrTWYWokGmM0DmFqKBpjNC5gyaIDZPIGpa2iA2byBqQUaYDaPYOoCDTCbVzA16w7TfuoudhPpf2ePHzw8fv/yoUcw5fZLipb9PNn91qXuTXJalbVwyhtoAQMtYKAFDLSAgRYw0AIGWsBACxhoAQMtYKAFDLSAgRYw0AIGWsBACxhoAQMtYKAFDLSAgRYw0AIGWsBACxhoAQMtYKAFDLRgnafuK2iBEtiLre/7oAXpEkx30AJ0FUyB5rybYAo0xy0DU6A5bRWYAs1h68AUaM7aBKZAc1QfMAWak/qCKdAcNARMgda4oWAKtIaNAVOgNWosmAKtQVPAFGiVmwqmQKtYDjAFWqVygSnQqjQ7ygWmQCvfj1m6+y5lDLSyzcHuvd3ZOjpNGQOtXEXAFGhlKgamQMtfUTAFWt6KgynQ8lUFTIGWp2pgCrTpVQVToE2rOpgCbXxNwBRo42oGpkAbXlMwBdqwmoMp0PrnAkyB1i83YAq0zbkCU6Ctzx2YAm11LsEUaEvr3IKpf7fsdyQUBX1tAAAAAElFTkSuQmCC"/>
+</defs>
 </svg>
