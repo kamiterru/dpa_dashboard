@@ -3,8 +3,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-full flex items-center justify-center bg-slate-50 py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">DPA Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Data Processing Agreement Management</p>
+          <h1 className="font-poppins text-[32px] font-bold text-[#1d2d47] leading-tight">DPA Dashboard</h1>
+          <p className="font-poppins text-[20px] text-slate-500 mt-1">Welcome Back</p>
         </div>
         {children}
       </div>
