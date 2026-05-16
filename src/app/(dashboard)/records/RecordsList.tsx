@@ -156,7 +156,7 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
           {canWrite && (
             <Link
               href="/records/new"
-              className="font-poppins text-sm font-semibold text-white bg-[#2b53aa] hover:bg-[#234491] rounded-[8px] px-4 py-2 border border-[#b2f9fb] transition-colors whitespace-nowrap"
+              className="font-poppins text-sm font-semibold text-white bg-[#2b53aa] hover:bg-[#234491] rounded-[8px] px-4 py-2 transition-colors whitespace-nowrap"
             >
               + New record
             </Link>
@@ -177,9 +177,9 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
             <SortIcon field="name" active={sortField === 'name'} dir={sortDir} />
           </button>
           <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Products</span>
-          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">DPA Date</span>
+          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider text-right">DPA Date</span>
           <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Status</span>
-          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">Published</span>
+          <span className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider text-right">Published</span>
           {/* LAST CHECKED — sortable */}
           <button
             onClick={() => toggleSort('last_checked')}
@@ -214,14 +214,14 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
             </span>
 
             {/* DPA date */}
-            <span className="font-inter text-sm text-[#536072]">{fmt(row.dpa_date)}</span>
+            <span className="font-inter text-sm text-[#536072] text-right">{fmt(row.dpa_date)}</span>
 
             {/* Status pill */}
             <div><StatusBadge status={row.current_status} /></div>
 
             {/* Published */}
             <span
-              className={`font-inter text-sm font-medium ${row.published ? 'text-[#16a34a]' : 'text-[#64748b] font-light'}`}
+              className={`font-inter text-sm font-medium text-right ${row.published ? 'text-[#16a34a]' : 'text-[#64748b] font-light'}`}
             >
               {row.published ? 'Live' : 'Draft'}
             </span>

@@ -37,8 +37,16 @@ export function Sidebar({ userRole }: { userRole?: string }) {
       {/* Logo / brand */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          {/* Logo mark — orange/yellow accent square */}
-          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex-shrink-0" />
+          {/* Logo mark */}
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="flex-shrink-0" aria-hidden="true">
+            <polygon points="4,4 24,14 4,24" fill="url(#logo-grad)" />
+            <defs>
+              <linearGradient id="logo-grad" x1="4" y1="4" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor="#f97316" />
+              </linearGradient>
+            </defs>
+          </svg>
           <p className="font-poppins text-base font-semibold text-slate-400 tracking-wide">
             DPA Dashboard
           </p>
