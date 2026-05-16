@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { label: 'Requested', href: '/records?filter=requested', filter: 'requested' },
 ]
 
-export function Sidebar({ userRole }: { userRole?: string }) {
+export function Sidebar({ userRole }: { userRole: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentFilter = searchParams.get('filter')
@@ -67,18 +67,18 @@ export function Sidebar({ userRole }: { userRole?: string }) {
 
         {isAdmin && (
           <>
-            <p className="px-3 pt-4 pb-1 font-poppins text-xs font-semibold uppercase tracking-widest text-[#64748b]">
+            <p className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
               Admin
             </p>
             <Link
               href="/admin/users"
-              className={`flex items-center rounded-lg px-3 py-2 font-poppins text-sm font-medium transition-colors ${
-                pathname.startsWith('/admin')
-                  ? 'bg-[#334155] text-white'
-                  : 'text-[#cbd5e1] hover:bg-slate-800 hover:text-white'
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                pathname.startsWith('/admin/users')
+                  ? 'bg-slate-700 text-white'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
             >
-              Users
+              User management
             </Link>
           </>
         )}
