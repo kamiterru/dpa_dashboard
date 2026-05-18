@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { StatusBadge } from '@/components/StatusBadge'
 import { saveRecord, requestAnalysis } from '@/app/actions/records'
 import type { UserRole } from '@/lib/types'
@@ -17,87 +18,225 @@ interface Props {
   changes: AnyRecord[]
   canEdit: boolean
   userRole: UserRole
+  needsReview: boolean
 }
 
-// ─── Field definitions ───────────────────────────────────────────────────────
+interface FieldDef {
+  key: string
+  label: string
+  type: string
+  options?: string[]
+  hint?: string
+}
 
-const ORG_FIELDS = [
-  { key: 'name', label: 'Display name', type: 'text' },
-  { key: 'legal_name', label: 'Legal name', type: 'text' },
-  { key: 'url_link', label: 'DPA / Privacy URL', type: 'url' },
-  { key: 'products', label: 'Product name', type: 'text' },
-  { key: 'product_description', label: 'Product description', type: 'textarea' },
-  { key: 'data_types', label: 'Data types processed', type: 'textarea' },
-  { key: 'location', label: 'Location(s)', type: 'text', hint: 'Comma-separated' },
-  { key: 'include_entity', label: 'Includes subsidiaries?', type: 'boolean' },
+// 'source' tells the read view which data object to read from
+interface ReadFieldDef extends FieldDef {
+  source?: 'org' | 'doc'
+}
+
+// ─── Edit-view field definitions ─────────────────────────────────────────────
+
+const ORG_FIELDS: FieldDef[] = [
+  { key: 'name',                label: 'Display name',          type: 'text' },
+  { key: 'legal_name',          label: 'Legal name',            type: 'text' },
+  { key: 'url_link',            label: 'DPA / Privacy URL',     type: 'url' },
+  { key: 'products',            label: 'Product name',          type: 'text' },
+  { key: 'product_description', label: 'Product description',   type: 'textarea' },
+  { key: 'data_types',          label: 'Data types processed',  type: 'textarea' },
+  { key: 'location',            label: 'HQ Location',           type: 'text' },
+  { key: 'include_entity',      label: 'DPA covers subsidiaries?', type: 'boolean' },
 ]
 
-const DOC_SECTIONS = [
+const DOC_SECTIONS: { title: string; fields: FieldDef[] }[] = [
   {
     title: 'DPA Overview',
     fields: [
-      { key: 'dpa_date', label: 'DPA date', type: 'date' },
-      { key: 'dpa_date_notes', label: 'Date notes', type: 'textarea' },
-      { key: 'jurisdiction_summary', label: 'Jurisdiction summary', type: 'textarea' },
-      { key: 'current_status', label: 'Status', type: 'select', options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'] },
+      { key: 'dpa_date',             label: 'Date of DPA',                type: 'date' },
+      { key: 'dpa_date_notes',       label: 'Date – Additional Notes',    type: 'textarea' },
+      { key: 'jurisdiction_summary', label: 'Covered Jurisdictions',      type: 'textarea' },
+      { key: 'current_status',       label: 'Status',                     type: 'select', options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'] },
     ],
   },
   {
     title: 'Data Storage & Transfers',
     fields: [
-      { key: 'data_held_summary', label: 'Data held summary', type: 'textarea' },
-      { key: 'transfer_out_choice', label: 'Transfer outside EEA/UK', type: 'select', options: ['Yes', 'No', 'With consent'] },
-      { key: 'SSC_in_place', label: 'SCCs in place', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'SSC_summary', label: 'SCCs summary', type: 'textarea' },
+      { key: 'data_held_explicit',  label: 'Location of Data:',                    type: 'textarea' },
+      { key: 'data_held_summary',   label: 'Data Location Details:',               type: 'textarea' },
+      { key: 'transfer_out_choice', label: 'Transfers outside EEA / UK allowed?',  type: 'select', options: ['Yes', 'No', 'With consent'] },
+      { key: 'SSC_in_place',        label: 'Are SCCs in place?',                   type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'SSC_summary',         label: 'SCC Summary',                          type: 'textarea' },
     ],
   },
   {
     title: 'Security & Sub-processors',
     fields: [
-      { key: 'tech_measures', label: 'Technical measures', type: 'textarea' },
-      { key: 'tech_measure_contractual', label: 'Measures contractually binding', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'tech_measure_details', label: 'Measures details (if Unclear)', type: 'textarea' },
-      { key: 'sub_processor_auth', label: 'Sub-processor authorisation', type: 'select', options: ['General', 'Specific', 'Unclear'] },
-      { key: 'sub_auth_details', label: 'Sub-processor details', type: 'textarea' },
-      { key: 'flowdown', label: 'Obligations flow to sub-processors', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'flowdown_details', label: 'Flowdown details', type: 'textarea' },
+      { key: 'tech_measures',            label: 'Details of technical/security measures', type: 'textarea' },
+      { key: 'tech_measure_contractual', label: 'Are measures contractually binding?',    type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'tech_measure_details',     label: 'Contractual measures details',           type: 'textarea' },
+      { key: 'sub_processor_auth',       label: 'Sub-processor authorisation',            type: 'select', options: ['General', 'Specific', 'Unclear'] },
+      { key: 'sub_auth_details',         label: 'Sub-processor details',                  type: 'textarea' },
+      { key: 'flowdown',                 label: 'Do obligations flow to sub-processors?', type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'flowdown_details',         label: 'Flowdown details',                       type: 'textarea' },
     ],
   },
   {
     title: 'Rights & Obligations',
     fields: [
-      { key: 'process_on_instruction', label: 'Process on instruction only', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'instruction_details', label: 'Instruction details', type: 'textarea' },
-      { key: 'rights_assistance', label: 'Data subject rights assistance', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'rights_assistance_details', label: 'Rights assistance details', type: 'textarea' },
-      { key: 'staff_conf', label: 'Staff confidentiality obligations', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'staff_conf_details', label: 'Staff confidentiality details', type: 'textarea' },
-      { key: 'data_breach_notice', label: 'Data breach notice', type: 'textarea' },
-      { key: 'data_termination', label: 'Data on termination', type: 'textarea' },
+      { key: 'process_on_instruction',    label: 'Process data on instructions only',    type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'instruction_details',       label: 'Data instructions details',            type: 'textarea' },
+      { key: 'rights_assistance',         label: 'Assistance with data subject rights',  type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'rights_assistance_details', label: 'Rights assistance details',            type: 'textarea' },
+      { key: 'staff_conf',                label: 'Staff confidentiality obligations',    type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'staff_conf_details',        label: 'Confidentiality details',              type: 'textarea' },
+      { key: 'data_breach_notice',        label: 'Data breach notice',                   type: 'textarea' },
+      { key: 'data_termination',          label: 'Data on termination',                  type: 'textarea' },
     ],
   },
   {
     title: 'Audit & Governance',
     fields: [
-      { key: 'audit_rights_type', label: 'Audit rights', type: 'select', options: ['Yes', 'No', 'Unclear', 'Structured'] },
-      { key: 'audit_rights_summary', label: 'Audit rights summary', type: 'textarea' },
-      { key: 'assistance', label: 'DPIA assistance', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'assistance_details', label: 'DPIA assistance details', type: 'textarea' },
-      { key: 'dpa_incorp', label: 'DPA incorporated into contract', type: 'select', options: ['Yes', 'No', 'Unclear'] },
-      { key: 'dpa_incorp_details', label: 'Incorporation details', type: 'textarea' },
+      { key: 'audit_rights_type',    label: 'Audit rights',                    type: 'select', options: ['Yes', 'No', 'Unclear', 'Structured'] },
+      { key: 'audit_rights_summary', label: 'Audit rights summary',            type: 'textarea' },
+      { key: 'assistance',           label: 'DPIA assistance',                 type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'assistance_details',   label: 'DPIA assistance details',         type: 'textarea' },
+      { key: 'dpa_incorp',           label: 'DPA incorporated into contract',  type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'dpa_incorp_details',   label: 'Incorporation details',           type: 'textarea' },
     ],
   },
 ]
 
+// ─── Read-view field definitions ─────────────────────────────────────────────
+// Matches Figma node 430:1276 (record_view_read_record) exactly.
+// source: 'org' reads from the org object; default ('doc') reads from doc.
+
+const READ_ORG_FIELDS: ReadFieldDef[] = [
+  { key: 'legal_name',          label: 'Legal Name',           type: 'text',     source: 'org' },
+  { key: 'products',            label: 'Product Name',         type: 'text',     source: 'org' },
+  { key: 'product_description', label: 'Product Description',  type: 'textarea', source: 'org' },
+  { key: 'data_types',          label: 'Data Types Processed', type: 'textarea', source: 'org' },
+  { key: 'location',            label: 'HQ Location',          type: 'text',     source: 'org' },
+]
+
+const READ_DOC_SECTIONS: { title: string; fields: ReadFieldDef[] }[] = [
+  {
+    title: 'DPA Overview',
+    fields: [
+      { key: 'dpa_date',             label: 'Date of DPA',              type: 'date' },
+      { key: 'dpa_date_notes',       label: 'Date - Additional Notes',  type: 'textarea' },
+      // include_entity and url_link sourced from org but displayed in this section per Figma
+      { key: 'include_entity',       label: 'DPA Covers subsidiaries?', type: 'boolean',  source: 'org' },
+      { key: 'jurisdiction_summary', label: 'Covered Jurisdictions',    type: 'textarea' },
+      { key: 'url_link',             label: 'DPA URL',                  type: 'url',      source: 'org' },
+      // current_status is NOT a field row — shown only in the header status chip
+    ],
+  },
+  {
+    title: 'Data Storage & Transfers',
+    fields: [
+      { key: 'data_held_explicit',  label: 'Location of Data:',                    type: 'text' },
+      { key: 'data_held_summary',   label: 'Data Location Details:',               type: 'textarea' },
+      { key: 'transfer_out_choice', label: 'Transfers outside EEA / UK allowed?',  type: 'select' },
+      { key: 'SSC_in_place',        label: 'Are SCCs in place?',                   type: 'select' },
+      { key: 'SSC_summary',         label: 'SCC Summary',                          type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Security & Sub-processors',
+    fields: [
+      { key: 'tech_measures',            label: 'Details of technical/security measures', type: 'textarea' },
+      { key: 'tech_measure_contractual', label: 'Are measures contractually binding?',    type: 'select' },
+      { key: 'tech_measure_details',     label: 'Contractual measures details',           type: 'textarea' },
+      { key: 'sub_processor_auth',       label: 'Sub-processor authorisation',            type: 'select' },
+      { key: 'sub_auth_details',         label: 'Sub-processor details',                  type: 'textarea' },
+      { key: 'flowdown',                 label: 'Do obligations flow to sub-processors?', type: 'select' },
+      { key: 'flowdown_details',         label: 'Flowdown details',                       type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Rights & Obligations',
+    fields: [
+      { key: 'process_on_instruction',    label: 'Process data on instructions only',   type: 'select' },
+      { key: 'instruction_details',       label: 'Data instructions details',           type: 'textarea' },
+      { key: 'rights_assistance',         label: 'Assistance with data subject rights', type: 'select' },
+      { key: 'rights_assistance_details', label: 'Rights assistance details',           type: 'textarea' },
+      { key: 'staff_conf',                label: 'Staff confidentiality obligations',   type: 'select' },
+      { key: 'staff_conf_details',        label: 'Confidentiality details',             type: 'textarea' },
+      { key: 'data_breach_notice',        label: 'Data breach notice',                  type: 'textarea' },
+      { key: 'data_termination',          label: 'Data on termination',                 type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Audit & Governance',
+    fields: [
+      { key: 'audit_rights_type',    label: 'Audit rights',                   type: 'select' },
+      { key: 'audit_rights_summary', label: 'Audit rights summary',           type: 'textarea' },
+      { key: 'assistance',           label: 'DPIA assistance',                type: 'select' },
+      { key: 'assistance_details',   label: 'DPIA assistance details',        type: 'textarea' },
+      { key: 'dpa_incorp',           label: 'DPA incorporated into contract', type: 'select' },
+      { key: 'dpa_incorp_details',   label: 'Incorporation details',          type: 'textarea' },
+    ],
+  },
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+// Renders a read-only value.
+// Boolean true/false and select Yes/No → filled check_circle / cancel icons at 16px.
+function ReadValue({ value, type }: { value: unknown; type: string }) {
+  // Boolean fields
+  if (type === 'boolean') {
+    if (value === true)
+      return <span className="material-symbols-outlined icon-filled icon-sm text-green-600">check_circle</span>
+    if (value === false)
+      return <span className="material-symbols-outlined icon-filled icon-sm text-red-500">cancel</span>
+    return <span className="text-slate-300">—</span>
+  }
+
+  const str = formatDisplayValue(value)
+
+  // Yes / No select values → icons
+  if (str === 'Yes')
+    return <span className="material-symbols-outlined icon-filled icon-sm text-green-600">check_circle</span>
+  if (str === 'No')
+    return <span className="material-symbols-outlined icon-filled icon-sm text-red-500">cancel</span>
+
+  if (!str) return <span className="text-slate-300">—</span>
+
+  if (type === 'url') {
+    return (
+      <a href={str} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">
+        {str}
+      </a>
+    )
+  }
+
+  return <span className="break-words">{str}</span>
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function RecordEditor({ doc, org, changes, canEdit }: Props) {
+export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props) {
+  const router = useRouter()
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Edit-mode state
   const [orgState, setOrgState] = useState<AnyRecord>({ ...org })
   const [docState, setDocState] = useState<AnyRecord>({ ...doc })
   const [isDirty, setIsDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const [analysisUrl, setAnalysisUrl] = useState(org?.url_link ?? '')
   const [analysisQueued, setAnalysisQueued] = useState(false)
@@ -107,13 +246,11 @@ export function RecordEditor({ doc, org, changes, canEdit }: Props) {
   function updateOrg(key: string, value: unknown) {
     setOrgState(s => ({ ...s, [key]: value }))
     setIsDirty(true)
-    setSaveSuccess(false)
   }
 
   function updateDoc(key: string, value: unknown) {
     setDocState(s => ({ ...s, [key]: value }))
     setIsDirty(true)
-    setSaveSuccess(false)
   }
 
   async function handleSave() {
@@ -151,7 +288,8 @@ export function RecordEditor({ doc, org, changes, canEdit }: Props) {
       setSaveError(result.error)
     } else {
       setIsDirty(false)
-      setSaveSuccess(true)
+      router.refresh()
+      setIsEditing(false)
     }
   }
 
@@ -167,27 +305,31 @@ export function RecordEditor({ doc, org, changes, canEdit }: Props) {
     }
   }
 
-  return (
-    <div className="p-8 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <Link href="/records" className="text-sm text-slate-500 hover:text-slate-700">
-              ← Records
-            </Link>
-            <span className="text-slate-300">/</span>
-            <span className="text-sm text-slate-500">{orgState.name}</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">{orgState.name}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {orgState.legal_name && `${orgState.legal_name} · `}
-            {orgState.products}
-          </p>
+  // ── Edit view ──────────────────────────────────────────────────────────────
+
+  if (isEditing && canEdit) {
+    return (
+      <div className="p-8 max-w-4xl">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 mb-6 text-[12px] text-[#64748b] tracking-[0.4px]">
+          <button
+            onClick={() => setIsEditing(false)}
+            className="flex items-center gap-2 hover:text-slate-700"
+          >
+            <span className="material-symbols-outlined icon-xs">arrow_left_alt</span>
+            Records
+          </button>
+          <span className="text-[#c7cdd6]">/</span>
+          <span>{orgState.name}</span>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <StatusBadge status={docState.current_status} />
-          {canEdit && (
+
+        {/* Header card */}
+        <div className="bg-white rounded-xl p-6 flex items-start justify-between mb-4">
+          <h1 className="font-poppins font-semibold text-[32px] leading-7 text-black">
+            {orgState.name}
+          </h1>
+          <div className="flex items-center gap-3">
+            <StatusBadge status={docState.current_status} />
             <button
               onClick={handleSave}
               disabled={!isDirty || saving}
@@ -195,182 +337,231 @@ export function RecordEditor({ doc, org, changes, canEdit }: Props) {
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
-          )}
+          </div>
         </div>
-      </div>
 
-      {saveError && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2">{saveError}</div>
-      )}
-      {saveSuccess && (
-        <div className="mb-4 text-sm text-green-700 bg-green-50 rounded-lg px-4 py-2">
-          Changes saved successfully.
-        </div>
-      )}
+        {saveError && (
+          <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2">{saveError}</div>
+        )}
 
-      {/* Organisation details */}
-      <Section title="Organisation">
-        <FieldGrid>
-          {ORG_FIELDS.map(field => (
-            <FieldRow
-              key={field.key}
-              field={field}
-              value={orgState[field.key]}
-              canEdit={canEdit}
-              onChange={v => updateOrg(field.key, v)}
-            />
-          ))}
-        </FieldGrid>
-      </Section>
-
-      {/* DPA document sections */}
-      {DOC_SECTIONS.map(section => (
-        <Section key={section.title} title={section.title}>
-          <FieldGrid>
-            {section.fields.map(field => (
-              <FieldRow
+        <div className="flex flex-col gap-4">
+          <EditSection title="Organisation">
+            {ORG_FIELDS.map(field => (
+              <EditFieldRow
                 key={field.key}
                 field={field}
-                value={docState[field.key]}
-                canEdit={canEdit}
-                onChange={v => updateDoc(field.key, v)}
+                value={orgState[field.key]}
+                onChange={v => updateOrg(field.key, v)}
               />
             ))}
-          </FieldGrid>
-        </Section>
-      ))}
+          </EditSection>
 
-      {/* Request analysis */}
-      {canEdit && (
-        <Section title="AI Analysis">
-          <div className="space-y-3">
-            <p className="text-sm text-slate-500">
-              Queue a re-analysis of this DPA. The analysis will be picked up and run against the
-              live document at the URL below.
-            </p>
-            <div className="flex gap-3 items-end">
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-slate-600 mb-1">DPA URL</label>
-                <input
-                  type="url"
-                  value={analysisUrl}
-                  onChange={e => setAnalysisUrl(e.target.value)}
-                  className="input"
-                  placeholder="https://..."
+          {DOC_SECTIONS.map(section => (
+            <EditSection key={section.title} title={section.title}>
+              {section.fields.map(field => (
+                <EditFieldRow
+                  key={field.key}
+                  field={field}
+                  value={docState[field.key]}
+                  onChange={v => updateDoc(field.key, v)}
                 />
+              ))}
+            </EditSection>
+          ))}
+
+          <EditSection title="AI Analysis">
+            <div className="py-3 space-y-3">
+              <p className="text-sm text-slate-500">
+                Queue a re-analysis of this DPA. The analysis will be run against the live document at the URL below.
+              </p>
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">DPA URL</label>
+                  <input
+                    type="url"
+                    value={analysisUrl}
+                    onChange={e => setAnalysisUrl(e.target.value)}
+                    className="input"
+                    placeholder="https://..."
+                  />
+                </div>
+                <button
+                  onClick={handleRequestAnalysis}
+                  disabled={analysisLoading || analysisQueued}
+                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50 transition-colors"
+                >
+                  {analysisLoading ? 'Queuing…' : analysisQueued ? 'Queued ✓' : 'Request analysis'}
+                </button>
               </div>
-              <button
-                onClick={handleRequestAnalysis}
-                disabled={analysisLoading || analysisQueued}
-                className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50 transition-colors"
-              >
-                {analysisLoading ? 'Queuing…' : analysisQueued ? 'Queued ✓' : 'Request analysis'}
-              </button>
+              {analysisError && <p className="text-sm text-red-600">{analysisError}</p>}
             </div>
-            {analysisError && (
-              <p className="text-sm text-red-600">{analysisError}</p>
+          </EditSection>
+
+          <ChangeHistory changes={changes} />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Read view (default for all users) ─────────────────────────────────────
+
+  const lastReviewed = changes[0]?.date_of_review
+    ? formatDate(changes[0].date_of_review)
+    : null
+
+  return (
+    <div className="p-8 max-w-4xl">
+      {/* Breadcrumb — sits above all cards, matches Figma breadcrumbs node */}
+      <div className="flex items-center gap-2 mb-6 text-[12px] text-[#64748b] tracking-[0.2px]">
+        <Link href="/records" className="flex items-center gap-2 hover:text-slate-700">
+          {/* arrow_left_alt at 12×12px per Figma */}
+          <span className="material-symbols-outlined icon-xs">arrow_left_alt</span>
+          Records
+        </Link>
+        <span className="text-[#c7cdd6]">/</span>
+        <span>{org.name}</span>
+      </div>
+
+      {/* All cards in a 16px-gap column */}
+      <div className="flex flex-col gap-4">
+
+        {/* Header card — bg-white rounded-[12px] p-[24px] per Figma company_main_information */}
+        <div className="bg-white rounded-xl p-6 flex items-start justify-between">
+          <div className="flex flex-col gap-3">
+            {/* Poppins SemiBold 32px text-black per Figma dashboard_title style */}
+            <h1 className="font-poppins font-semibold text-[32px] leading-7 text-black">
+              {org.name}
+            </h1>
+            {lastReviewed && (
+              /* Inter Medium 14px #475569 tracking-[1px] per Figma normal_emphasis style */
+              <p className="text-sm font-medium text-[#475569] tracking-[1px]">
+                Last Reviewed: {lastReviewed}
+              </p>
             )}
           </div>
-        </Section>
-      )}
 
-      {/* Change history */}
-      <Section title="Change history">
-        {changes.length === 0 ? (
-          <p className="text-sm text-slate-400 py-2">No changes recorded yet.</p>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {changes.map(change => (
-              <div key={change.id} className="py-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-700">
-                      {change.status ?? 'Update'}
-                    </span>
-                    {change.needs_review && (
-                      <span className="text-xs text-amber-600">⚠ Needs review</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {change.date_of_review
-                      ? new Date(change.date_of_review).toLocaleString('en-GB', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })
-                      : '—'}
-                    {change.changed_by && (
-                      <span className="ml-2 text-slate-400">
-                        · {change.changed_by === 'system' ? 'System' : `User ${change.changed_by.slice(0, 8)}…`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <p className="text-sm text-slate-600">{change.summary_changes}</p>
-                {change.needs_review && change.need_review_reason && (
-                  <p className="text-xs text-amber-700 mt-1">{change.need_review_reason}</p>
-                )}
-              </div>
-            ))}
+          {/* Status cluster: flag (16px) | chip | edit pencil (16px) */}
+          <div className="flex items-center gap-3">
+            {needsReview && (
+              <span
+                className="material-symbols-outlined icon-filled icon-sm text-red-500"
+                title="Needs review"
+              >
+                flag
+              </span>
+            )}
+            <StatusBadge status={doc.current_status} />
+            {canEdit && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center justify-center hover:opacity-70 transition-opacity text-slate-400"
+                title="Edit record"
+              >
+                <span className="material-symbols-outlined icon-sm">edit</span>
+              </button>
+            )}
           </div>
-        )}
-      </Section>
+        </div>
+
+        {/* Organisation card */}
+        <ReadSection title="Organisation">
+          {READ_ORG_FIELDS.map(field => (
+            <ReadFieldRow key={field.key} field={field} org={org} doc={doc} />
+          ))}
+        </ReadSection>
+
+        {/* DPA document sections */}
+        {READ_DOC_SECTIONS.map(section => (
+          <ReadSection key={section.title} title={section.title}>
+            {section.fields.map(field => (
+              <ReadFieldRow key={field.key} field={field} org={org} doc={doc} />
+            ))}
+          </ReadSection>
+        ))}
+
+        <ChangeHistory changes={changes} />
+      </div>
     </div>
   )
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// Read section card: bg-white rounded-[12px] px-[24px] py-[12px], no border, no shadow
+function ReadSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6">
-      <div className="px-6 py-4 border-b border-slate-100">
-        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">{title}</h2>
+    <div className="bg-white rounded-xl px-6 py-3">
+      {/* Poppins SemiBold 14px, border-b 1.4px #eff2f5 per Figma sidebar_selected style */}
+      <div
+        className="pt-3 pb-4 flex items-center"
+        style={{ borderBottom: '1.4px solid #eff2f5' }}
+      >
+        <h2 className="font-poppins font-semibold text-[16px] leading-5 text-[#0f172a] uppercase tracking-[0.2px]">
+          {title}
+        </h2>
       </div>
-      <div className="px-6 py-4">{children}</div>
+      {/* gap-[4px] between rows per Figma */}
+      <div className="flex flex-col gap-1">
+        {children}
+      </div>
     </div>
   )
 }
 
-function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <div className="space-y-4">{children}</div>
+// Edit section card: same visual treatment as read, used in the edit view
+function EditSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl px-6 py-3">
+      <div
+        className="pt-3 pb-4 flex items-center"
+        style={{ borderBottom: '1.4px solid #eff2f5' }}
+      >
+        <h2 className="font-poppins font-semibold text-[16px] leading-5 text-[#0f172a] uppercase tracking-[0.2px]">
+          {title}
+        </h2>
+      </div>
+      <div className="space-y-1">{children}</div>
+    </div>
+  )
 }
 
-interface FieldDef {
-  key: string
-  label: string
-  type: string
-  options?: string[]
-  hint?: string
+// Read field row: flex gap-[56px], label w-[272px] text-[#64748b] tracking-[0.4px],
+// value flex-1 text-[#0f172a] — per Figma field row nodes
+function ReadFieldRow({
+  field,
+  org,
+  doc,
+}: {
+  field: ReadFieldDef
+  org: AnyRecord
+  doc: AnyRecord
+}) {
+  const value = field.source === 'org' ? org[field.key] : doc[field.key]
+  return (
+    <div className="flex items-start gap-14 py-3">
+      <dt className="text-sm text-[#64748b] w-[272px] shrink-0 leading-4">
+        {field.label}
+      </dt>
+      <dd className="flex-1 text-sm text-[#0f172a] leading-4">
+        <ReadValue value={value} type={field.type} />
+      </dd>
+    </div>
+  )
 }
 
-function FieldRow({
+function EditFieldRow({
   field,
   value,
-  canEdit,
   onChange,
 }: {
   field: FieldDef
   value: unknown
-  canEdit: boolean
   onChange: (v: unknown) => void
 }) {
   const displayValue = value === null || value === undefined ? '' : String(value)
 
-  if (!canEdit) {
-    return (
-      <div className="grid grid-cols-3 gap-4 items-start">
-        <dt className="text-sm font-medium text-slate-500 pt-0.5">{field.label}</dt>
-        <dd className="col-span-2 text-sm text-slate-900 break-words">
-          {field.type === 'boolean'
-            ? value === true ? 'Yes' : value === false ? 'No' : '—'
-            : displayValue || <span className="text-slate-300">—</span>}
-        </dd>
-      </div>
-    )
-  }
-
   return (
-    <div className="grid grid-cols-3 gap-4 items-start">
+    <div className="grid grid-cols-3 gap-4 items-start py-2">
       <label className="text-sm font-medium text-slate-600 pt-2">
         {field.label}
         {field.hint && <span className="block text-xs text-slate-400 font-normal">{field.hint}</span>}
@@ -414,5 +605,39 @@ function FieldRow({
         )}
       </div>
     </div>
+  )
+}
+
+function ChangeHistory({ changes }: { changes: AnyRecord[] }) {
+  return (
+    <ReadSection title="Change history">
+      {changes.length === 0 ? (
+        <p className="text-[12px] text-slate-400 py-3">No changes recorded yet.</p>
+      ) : (
+        <>
+          {changes.map(change => (
+            // 3-column row: date | summary | user — no dividers between rows per Figma
+            <div key={change.id} className="flex items-center gap-14 py-3">
+              {/* Date — Inter SemiBold 12px #0f172a tracking-[0.2px] w-[180px] */}
+              <p className="text-[12px] font-semibold text-[#0f172a] tracking-[0.2px] w-[180px] shrink-0">
+                {change.date_of_review
+                  ? new Date(change.date_of_review).toLocaleDateString('en-GB', {
+                      day: 'numeric', month: 'long', year: 'numeric',
+                    })
+                  : '—'}
+              </p>
+              {/* Summary — Inter Regular 12px #0f172a tracking-[0.4px], flex-1 to fill available space */}
+              <p className="text-[12px] text-[#0f172a] tracking-[0.4px] flex-1">
+                {change.summary_changes ?? '—'}
+              </p>
+              {/* User — Inter Regular 12px #64748b, auto width */}
+              <p className="text-[12px] text-[#64748b] whitespace-nowrap">
+                {change.changed_by_name}
+              </p>
+            </div>
+          ))}
+        </>
+      )}
+    </ReadSection>
   )
 }

@@ -37,3 +37,19 @@ body {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgb(59 130 246 / 0.15);
 }
+
+/* ── Material Symbols sizing ─────────────────────────────────────────────────
+   The Google Fonts stylesheet sets .material-symbols-outlined { font-size: 24px }
+   and loads after globals.css, winning any single-class specificity tie.
+   Combining both class names (.material-symbols-outlined.icon-*) gives us a
+   two-class selector that always beats the Google Fonts single-class rule.    */
+
+.material-symbols-outlined.icon-xs { font-size: 12px; line-height: 1; }   /* breadcrumb arrow */
+.material-symbols-outlined.icon-sm { font-size: 16px; line-height: 1; }   /* flag, edit, check_circle, cancel */
+.material-symbols-outlined.icon-md { font-size: 20px; line-height: 1; }   /* medium emphasis icons */
+.material-symbols-outlined.icon-lg { font-size: 24px; line-height: 1; }   /* large / hero icons */
+
+/* Filled variant for Material Symbols (e.g. check_circle, cancel) */
+.icon-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
