@@ -8,7 +8,8 @@ export async function saveRecord(
   docId: string,
   orgFields: Record<string, unknown>,
   docFields: Record<string, unknown>,
-  changeSummary: string
+  changeSummary: string,
+  needsReview = false,
 ) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -38,7 +39,7 @@ export async function saveRecord(
     doc_id: docId,
     is_changed: true,
     summary_changes: changeSummary || 'Fields updated via dashboard',
-    needs_review: false,
+    needs_review: needsReview,
     status: 'Updated',
     changed_by: user.id,
     date_of_review: new Date().toISOString(),

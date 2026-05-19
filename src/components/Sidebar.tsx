@@ -1,10 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useNavGuard } from '@/components/NavigationGuardProvider'
 
 const NAV_ITEMS = [
   { label: 'All Records', href: '/records', filter: null },
@@ -12,6 +11,31 @@ const NAV_ITEMS = [
   { label: 'For Review', href: '/records?filter=review', filter: 'review' },
   { label: 'Requested', href: '/records?filter=requested', filter: 'requested' },
 ]
+
+// Guard-aware navigation link — checks for unsaved changes before navigating
+function NavLink({
+  href,
+  children,
+  className,
+}: {
+  href: string
+  children: React.ReactNode
+  className: string
+}) {
+  const { requestNavigation } = useNavGuard()
+  const router = useRouter()
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault()
+    requestNavigation(() => router.push(href))
+  }
+
+  return (
+    <a href={href} onClick={handleClick} className={className}>
+      {children}
+    </a>
+  )
+}
 
 export function Sidebar({ userRole }: { userRole: string }) {
   const pathname = usePathname()
@@ -27,7 +51,7 @@ export function Sidebar({ userRole }: { userRole: string }) {
     router.refresh()
   }
 
-  function isActive(item: typeof NAV_ITEMS[0]) {
+  function isActive(item: (typeof NAV_ITEMS)[0]) {
     if (item.filter === null) return pathname === '/records' && !currentFilter
     return pathname === '/records' && currentFilter === item.filter
   }
@@ -38,7 +62,6 @@ export function Sidebar({ userRole }: { userRole: string }) {
       {/* Logo / brand */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          {/* Logo mark */}
           <Image src="/logo-mark.svg" alt="Logo" width={28} height={25} className="flex-shrink-0" />
           <p className="font-poppins text-base font-semibold text-slate-400 tracking-wide">
             DPA Dashboard
@@ -52,7 +75,7 @@ export function Sidebar({ userRole }: { userRole: string }) {
           Records
         </p>
         {NAV_ITEMS.map(item => (
-          <Link
+          <NavLink
             key={item.label}
             href={item.href}
             className={`flex items-center rounded-lg px-3 py-2 font-poppins text-sm font-medium transition-colors ${
@@ -62,7 +85,7 @@ export function Sidebar({ userRole }: { userRole: string }) {
             }`}
           >
             {item.label}
-          </Link>
+          </NavLink>
         ))}
 
         {isAdmin && (
@@ -70,7 +93,7 @@ export function Sidebar({ userRole }: { userRole: string }) {
             <p className="px-3 pt-4 pb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
               Admin
             </p>
-            <Link
+            <NavLink
               href="/admin/users"
               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 pathname.startsWith('/admin/users')
@@ -79,7 +102,7 @@ export function Sidebar({ userRole }: { userRole: string }) {
               }`}
             >
               User management
-            </Link>
+            </NavLink>
           </>
         )}
       </nav>
