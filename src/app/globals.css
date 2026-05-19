@@ -44,10 +44,11 @@ body {
    Combining both class names (.material-symbols-outlined.icon-*) gives us a
    two-class selector that always beats the Google Fonts single-class rule.    */
 
-.material-symbols-outlined.icon-xs { font-size: 12px; line-height: 1; }   /* breadcrumb arrow */
-.material-symbols-outlined.icon-sm { font-size: 16px; line-height: 1; }   /* flag, edit, check_circle, cancel */
-.material-symbols-outlined.icon-md { font-size: 20px; line-height: 1; }   /* medium emphasis icons */
-.material-symbols-outlined.icon-lg { font-size: 24px; line-height: 1; }   /* large / hero icons */
+.material-symbols-outlined.icon-xs     { font-size: 12px; line-height: 1; }   /* breadcrumb arrow */
+.material-symbols-outlined.icon-sm     { font-size: 16px; line-height: 1; }   /* flag, edit, check_circle, cancel */
+.material-symbols-outlined.icon-button { font-size: 18px; line-height: 1; }   /* icon-only action buttons */
+.material-symbols-outlined.icon-md     { font-size: 20px; line-height: 1; }   /* medium emphasis icons */
+.material-symbols-outlined.icon-lg     { font-size: 24px; line-height: 1; }   /* large / hero icons */
 
 /* Filled variant for Material Symbols (e.g. check_circle, cancel) */
 .icon-filled {

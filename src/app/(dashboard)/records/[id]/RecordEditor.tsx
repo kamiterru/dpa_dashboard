@@ -28,6 +28,8 @@ interface FieldDef {
   type: string
   options?: string[]
   hint?: string
+  /** For STATUS section fields that live in org_entity rather than document */
+  source?: 'org' | 'doc'
 }
 
 // 'source' tells the read view which data object to read from
@@ -45,6 +47,8 @@ const STATUS_FIELDS: FieldDef[] = [
     options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'],
   },
   { key: 'needs_review', label: 'Needs Review', type: 'boolean' },
+  // published lives in org_entity — source: 'org' routes it to orgState / updateOrg
+  { key: 'published', label: 'Published', type: 'toggle', source: 'org' },
 ]
 
 // ─── Edit-view field definitions ─────────────────────────────────────────────
@@ -255,6 +259,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showAnalyseModal, setShowAnalyseModal] = useState(false)
+  const [showCheckDateModal, setShowCheckDateModal] = useState(false)
 
   // ── Browser-level navigation guard (tab close / refresh) ──────────────────
   useEffect(() => {
@@ -309,7 +314,17 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
     const docChanges: AnyRecord = {}
     const changedLabels: string[] = []
 
+    // Org-table fields defined in ORG_FIELDS
     ORG_FIELDS.forEach(({ key }) => {
+      if (JSON.stringify(orgState[key]) !== JSON.stringify(org[key])) {
+        orgChanges[key] = orgState[key]
+        changedLabels.push(key)
+      }
+    })
+
+    // Org-sourced STATUS fields (e.g. published) — not in ORG_FIELDS since
+    // they live in the STATUS card, but they do belong to org_entity.
+    STATUS_FIELDS.filter(f => f.source === 'org').forEach(({ key }) => {
       if (JSON.stringify(orgState[key]) !== JSON.stringify(org[key])) {
         orgChanges[key] = orgState[key]
         changedLabels.push(key)
@@ -323,9 +338,10 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
       changedLabels.push('needs_review')
     }
 
-    // All other doc-table fields (current_status and the rest of the sections)
+    // Doc-table fields: STATUS fields that are not needs_review and not org-sourced,
+    // plus all the section fields.
     ;[
-      ...STATUS_FIELDS.filter(f => f.key !== 'needs_review'),
+      ...STATUS_FIELDS.filter(f => f.key !== 'needs_review' && f.source !== 'org'),
       ...DOC_SECTIONS.flatMap(s => s.fields),
     ].forEach(({ key }) => {
       if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
@@ -375,41 +391,45 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             {orgState.name}
           </h1>
 
-          <div className="flex items-center gap-[14px]">
-            {/* Cancel — always full opacity, styled as a subtle bordered button */}
+          {/* Icon-only action buttons — gap-2, rounded-[6px], icon-button (18px) */}
+          <div className="flex items-center gap-2">
+            {/* Cancel — red border, no fill */}
             <button
               onClick={() => requestNavigation(() => exitEditMode())}
-              className="flex items-center gap-1 border-2 border-[#cbd5e1] rounded-[8px] pl-3 pr-4 py-2"
+              title="Cancel"
+              className="border-2 border-[#e08484] rounded-[6px] p-[6px] hover:bg-red-50 transition-colors"
             >
-              <span className="material-symbols-outlined icon-sm text-[#cbd5e1]">close_small</span>
-              <span className="font-poppins font-semibold text-[14px] leading-5 text-[#cbd5e1]">
-                Cancel
-              </span>
+              <span className="material-symbols-outlined icon-button text-[#e08484]">close_small</span>
             </button>
 
-            {/* Analyse — purple, opens the analysis confirmation modal */}
+            {/* Check DPA Date — grey fill, event_repeat icon */}
+            <button
+              onClick={() => setShowCheckDateModal(true)}
+              title="Check DPA Date"
+              className="bg-[#bac3d1] rounded-[6px] px-[8px] py-[6px] hover:bg-[#a8b3c3] transition-colors"
+            >
+              <span className="material-symbols-outlined icon-button text-white">event_repeat</span>
+            </button>
+
+            {/* Re-analyse — grey fill, autoplay icon */}
             <button
               onClick={() => setShowAnalyseModal(true)}
-              className="flex items-center gap-1 bg-[#6e31af] rounded-[8px] pl-3 pr-4 py-2"
+              title="Re-analyse"
+              className="bg-[#bac3d1] rounded-[6px] px-[8px] py-[6px] hover:bg-[#a8b3c3] transition-colors"
             >
-              <span className="material-symbols-outlined icon-sm text-white">autoplay</span>
-              <span className="font-poppins font-semibold text-[14px] leading-5 text-white">
-                Analyse
-              </span>
+              <span className="material-symbols-outlined icon-button text-white">autoplay</span>
             </button>
 
-            {/* Save — 40% opacity until a change is made */}
+            {/* Save — blue fill, 40% opacity until dirty */}
             <button
               onClick={handleSave}
               disabled={!isDirty || saving}
-              className={`flex items-center gap-1 bg-[#2c53ab] rounded-[8px] pl-3 pr-4 py-2 transition-opacity ${
-                isDirty ? 'opacity-100' : 'opacity-40'
+              title={saving ? 'Saving…' : 'Save'}
+              className={`bg-[#2c53ab] rounded-[6px] px-[8px] py-[6px] transition-opacity ${
+                isDirty ? 'opacity-100 hover:bg-[#1e3f8a]' : 'opacity-40 cursor-not-allowed'
               }`}
             >
-              <span className="material-symbols-outlined icon-sm text-white">save</span>
-              <span className="font-poppins font-semibold text-[14px] leading-5 text-white">
-                {saving ? 'Saving…' : 'Save'}
-              </span>
+              <span className="material-symbols-outlined icon-button text-white">save</span>
             </button>
           </div>
         </div>
@@ -419,14 +439,18 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
         )}
 
         <div className="flex flex-col gap-4">
-          {/* Status section */}
+          {/* Status section — fields may be sourced from doc or org */}
           <EditSection title="Status">
             {STATUS_FIELDS.map(field => (
               <EditFieldRow
                 key={field.key}
                 field={field}
-                value={docState[field.key]}
-                onChange={v => updateDoc(field.key, v)}
+                value={field.source === 'org' ? orgState[field.key] : docState[field.key]}
+                onChange={v =>
+                  field.source === 'org'
+                    ? updateOrg(field.key, v)
+                    : updateDoc(field.key, v)
+                }
               />
             ))}
           </EditSection>
@@ -458,42 +482,36 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
           ))}
         </div>
 
-        {/* ── Analyse modal ── */}
+        {/* ── Re-analyse modal ── */}
         {showAnalyseModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-[8px] w-[540px] max-w-[90vw] px-6 py-12 flex flex-col gap-10">
-              <div className="flex flex-col gap-[26px]">
-                <h2 className="font-poppins font-semibold text-[24px] leading-[28px] text-black">
-                  Analysis request for {orgState.name}
-                </h2>
-                <div className="space-y-4 text-[16px] text-[#475569] leading-[23px]">
-                  <p>
-                    You have requested a re-analysis for this company. By clicking continue, we
-                    will first look for the date of the DPA – if it is different from the date
-                    stored, we will re-examine the rest of the DPA.
-                  </p>
-                  <p>We will let you know when this analysis is complete.</p>
-                </div>
-              </div>
-              <div className="flex gap-[14px] items-center justify-end">
-                <button
-                  onClick={() => setShowAnalyseModal(false)}
-                  className="border-2 border-[#1e293b] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-[#1e293b]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    // Analysis function not yet implemented — modal closes for now
-                    setShowAnalyseModal(false)
-                  }}
-                  className="bg-[#2c53ab] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-white"
-                >
-                  Yes, continue
-                </button>
-              </div>
-            </div>
-          </div>
+          <ConfirmModal
+            title={`Analysis request for ${orgState.name}`}
+            onCancel={() => setShowAnalyseModal(false)}
+            onConfirm={() => setShowAnalyseModal(false) /* TODO: wire up analysis */}
+          >
+            <p>
+              You have requested a re-analysis for this company. By clicking continue, we will
+              perform a full analysis for this company which may replace existing wording in
+              the analysis.
+            </p>
+            <p>We will let you know when this analysis is complete.</p>
+          </ConfirmModal>
+        )}
+
+        {/* ── Check DPA Date modal ── */}
+        {showCheckDateModal && (
+          <ConfirmModal
+            title={`Check Date for ${orgState.name}`}
+            onCancel={() => setShowCheckDateModal(false)}
+            onConfirm={() => setShowCheckDateModal(false) /* TODO: wire up date check */}
+          >
+            <p>
+              By clicking continue, we will check the date of the DPA for this company – if
+              it is different from the date stored, we will re-examine the rest of the DPA.
+              This is normally done on a weekly basis anyway, but you can make it happen now
+              if you need.
+            </p>
+          </ConfirmModal>
         )}
       </div>
     )
@@ -713,6 +731,26 @@ function EditFieldRow({
               keyboard_arrow_down
             </span>
           </>
+        ) : field.type === 'toggle' ? (
+          /* Toggle switch — ON (blue) when truthy, OFF (grey) when falsy */
+          <div className="pt-1">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(value)}
+              onClick={() => onChange(!value)}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                value ? 'bg-[#2c53ab]' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${
+                  value ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         ) : (
           <input
             type={field.type}
@@ -721,6 +759,48 @@ function EditFieldRow({
             className="input text-sm"
           />
         )}
+      </div>
+    </div>
+  )
+}
+
+// Shared confirmation modal — used for Analyse and Check DPA Date prompts
+function ConfirmModal({
+  title,
+  children,
+  onCancel,
+  onConfirm,
+}: {
+  title: string
+  children: React.ReactNode
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-[8px] w-[540px] max-w-[90vw] px-6 py-12 flex flex-col gap-10">
+        <div className="flex flex-col gap-[26px]">
+          <h2 className="font-poppins font-semibold text-[24px] leading-[28px] text-black">
+            {title}
+          </h2>
+          <div className="space-y-4 text-[16px] text-[#475569] leading-[23px]">
+            {children}
+          </div>
+        </div>
+        <div className="flex gap-[14px] items-center justify-end">
+          <button
+            onClick={onCancel}
+            className="border-2 border-[#1e293b] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-[#1e293b]"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="bg-[#2c53ab] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-white"
+          >
+            Yes, continue
+          </button>
+        </div>
       </div>
     </div>
   )
