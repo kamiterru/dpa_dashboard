@@ -223,11 +223,13 @@ function ReadValue({ value, type }: { value: unknown; type: string }) {
 
   const str = formatDisplayValue(value)
 
-  // Yes / No select values → icons
+  // Yes / No / Unclear select values → icons
   if (str === 'Yes')
     return <span className="material-symbols-outlined icon-filled icon-sm text-green-600">check_circle</span>
   if (str === 'No')
     return <span className="material-symbols-outlined icon-filled icon-sm text-red-500">cancel</span>
+  if (str === 'Unclear')
+    return <span className="material-symbols-outlined icon-filled icon-sm" style={{ color: '#F49A33' }}>help</span>
 
   if (!str) return <span className="text-slate-300">—</span>
 
@@ -391,13 +393,15 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             {orgState.name}
           </h1>
 
-          {/* Icon-only action buttons — gap-2, rounded-[6px], icon-button (18px) */}
+          {/* Icon-only action buttons — gap-2, rounded-[6px], icon-button (18px).
+              flex+items-center on each button prevents the inline descender gap
+              that would otherwise add extra space below the icon. */}
           <div className="flex items-center gap-2">
             {/* Cancel — red border, no fill */}
             <button
               onClick={() => requestNavigation(() => exitEditMode())}
               title="Cancel"
-              className="border-2 border-[#e08484] rounded-[6px] p-[6px] hover:bg-red-50 transition-colors"
+              className="flex items-center justify-center border-2 border-[#e08484] rounded-[6px] p-[6px] hover:bg-red-50 transition-colors"
             >
               <span className="material-symbols-outlined icon-button text-[#e08484]">close_small</span>
             </button>
@@ -406,7 +410,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             <button
               onClick={() => setShowCheckDateModal(true)}
               title="Check DPA Date"
-              className="bg-[#bac3d1] rounded-[6px] px-[8px] py-[6px] hover:bg-[#a8b3c3] transition-colors"
+              className="flex items-center justify-center bg-[#bac3d1] rounded-[6px] p-[6px] hover:bg-[#a8b3c3] transition-colors"
             >
               <span className="material-symbols-outlined icon-button text-white">event_repeat</span>
             </button>
@@ -415,7 +419,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             <button
               onClick={() => setShowAnalyseModal(true)}
               title="Re-analyse"
-              className="bg-[#bac3d1] rounded-[6px] px-[8px] py-[6px] hover:bg-[#a8b3c3] transition-colors"
+              className="flex items-center justify-center bg-[#bac3d1] rounded-[6px] p-[6px] hover:bg-[#a8b3c3] transition-colors"
             >
               <span className="material-symbols-outlined icon-button text-white">autoplay</span>
             </button>
@@ -425,7 +429,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
               onClick={handleSave}
               disabled={!isDirty || saving}
               title={saving ? 'Saving…' : 'Save'}
-              className={`bg-[#2c53ab] rounded-[6px] px-[8px] py-[6px] transition-opacity ${
+              className={`flex items-center justify-center bg-[#2c53ab] rounded-[6px] p-[6px] transition-opacity ${
                 isDirty ? 'opacity-100 hover:bg-[#1e3f8a]' : 'opacity-40 cursor-not-allowed'
               }`}
             >
@@ -814,8 +818,9 @@ function ChangeHistory({ changes }: { changes: AnyRecord[] }) {
       ) : (
         <>
           {changes.map(change => (
-            // 3-column row: date | summary | user — no dividers between rows per Figma
-            <div key={change.id} className="flex items-center gap-14 py-3">
+            // 3-column row: date | summary | user — top-aligned so long summaries
+            // don't leave the date floating in the middle of the row
+            <div key={change.id} className="flex items-start gap-14 py-3">
               {/* Date — Inter SemiBold 12px #0f172a tracking-[0.2px] w-[180px] */}
               <p className="text-[12px] font-semibold text-[#0f172a] tracking-[0.2px] w-[180px] shrink-0">
                 {change.date_of_review
