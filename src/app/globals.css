@@ -23,7 +23,7 @@ body {
 /* Shared input / select / textarea style used across the dashboard */
 .input {
   width: 100%;
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   border: 1px solid #cbd5e1;
   padding: 0.375rem 0.625rem;
   font-size: 0.875rem;

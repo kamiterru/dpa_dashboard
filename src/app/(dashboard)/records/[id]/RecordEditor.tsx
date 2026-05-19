@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { StatusBadge } from '@/components/StatusBadge'
-import { saveRecord, requestAnalysis } from '@/app/actions/records'
+import { saveRecord } from '@/app/actions/records'
+import { useNavGuard } from '@/components/NavigationGuardProvider'
 import type { UserRole } from '@/lib/types'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -34,27 +35,39 @@ interface ReadFieldDef extends FieldDef {
   source?: 'org' | 'doc'
 }
 
+// ─── Status section (top of edit view) ───────────────────────────────────────
+
+const STATUS_FIELDS: FieldDef[] = [
+  {
+    key: 'current_status',
+    label: 'Current Status',
+    type: 'select',
+    options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'],
+  },
+  { key: 'needs_review', label: 'Needs Review', type: 'boolean' },
+]
+
 // ─── Edit-view field definitions ─────────────────────────────────────────────
 
 const ORG_FIELDS: FieldDef[] = [
-  { key: 'name',                label: 'Display name',          type: 'text' },
-  { key: 'legal_name',          label: 'Legal name',            type: 'text' },
-  { key: 'url_link',            label: 'DPA / Privacy URL',     type: 'url' },
-  { key: 'products',            label: 'Product name',          type: 'text' },
-  { key: 'product_description', label: 'Product description',   type: 'textarea' },
-  { key: 'data_types',          label: 'Data types processed',  type: 'textarea' },
-  { key: 'location',            label: 'HQ Location',           type: 'text' },
+  { key: 'name',                label: 'Display name',             type: 'text' },
+  { key: 'legal_name',          label: 'Legal name',               type: 'text' },
+  { key: 'url_link',            label: 'DPA / Privacy URL',        type: 'url' },
+  { key: 'products',            label: 'Product name',             type: 'text' },
+  { key: 'product_description', label: 'Product description',      type: 'textarea' },
+  { key: 'data_types',          label: 'Data types processed',     type: 'textarea' },
+  { key: 'location',            label: 'HQ Location',              type: 'text' },
   { key: 'include_entity',      label: 'DPA covers subsidiaries?', type: 'boolean' },
 ]
 
+// current_status has been moved to STATUS_FIELDS; no longer in DPA Overview
 const DOC_SECTIONS: { title: string; fields: FieldDef[] }[] = [
   {
     title: 'DPA Overview',
     fields: [
-      { key: 'dpa_date',             label: 'Date of DPA',                type: 'date' },
-      { key: 'dpa_date_notes',       label: 'Date – Additional Notes',    type: 'textarea' },
-      { key: 'jurisdiction_summary', label: 'Covered Jurisdictions',      type: 'textarea' },
-      { key: 'current_status',       label: 'Status',                     type: 'select', options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'] },
+      { key: 'dpa_date',             label: 'Date of DPA',             type: 'date' },
+      { key: 'dpa_date_notes',       label: 'Date – Additional Notes', type: 'textarea' },
+      { key: 'jurisdiction_summary', label: 'Covered Jurisdictions',   type: 'textarea' },
     ],
   },
   {
@@ -229,29 +242,64 @@ function ReadValue({ value, type }: { value: unknown; type: string }) {
 
 export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props) {
   const router = useRouter()
-  const [isEditing, setIsEditing] = useState(false)
+  const { setDirty: setContextDirty, requestNavigation } = useNavGuard()
 
-  // Edit-mode state
+  const [isEditing, setIsEditing] = useState(false)
   const [orgState, setOrgState] = useState<AnyRecord>({ ...org })
-  const [docState, setDocState] = useState<AnyRecord>({ ...doc })
+  const [docState, setDocState] = useState<AnyRecord>({
+    ...doc,
+    // Seed needs_review from doc if present, else fall back to the prop
+    needs_review: needsReview, // lives on changes table, seeded from the latest change entry
+  })
   const [isDirty, setIsDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [showAnalyseModal, setShowAnalyseModal] = useState(false)
 
-  const [analysisUrl, setAnalysisUrl] = useState(org?.url_link ?? '')
-  const [analysisQueued, setAnalysisQueued] = useState(false)
-  const [analysisError, setAnalysisError] = useState<string | null>(null)
-  const [analysisLoading, setAnalysisLoading] = useState(false)
+  // ── Browser-level navigation guard (tab close / refresh) ──────────────────
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
+  // ── Dirty-state helpers ───────────────────────────────────────────────────
+
+  function markDirty() {
+    setIsDirty(true)
+    setContextDirty(true)
+  }
+
+  function markClean() {
+    setIsDirty(false)
+    setContextDirty(false)
+  }
+
+  function exitEditMode() {
+    setIsEditing(false)
+    setOrgState({ ...org })
+    setDocState({
+      ...doc,
+      needs_review: needsReview, // lives on changes table, seeded from the latest change entry
+    })
+    markClean()
+  }
 
   function updateOrg(key: string, value: unknown) {
     setOrgState(s => ({ ...s, [key]: value }))
-    setIsDirty(true)
+    markDirty()
   }
 
   function updateDoc(key: string, value: unknown) {
     setDocState(s => ({ ...s, [key]: value }))
-    setIsDirty(true)
+    markDirty()
   }
+
+  // ── Save ─────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     setSaving(true)
@@ -268,40 +316,37 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
       }
     })
 
-    DOC_SECTIONS.forEach(section =>
-      section.fields.forEach(({ key }) => {
-        if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
-          docChanges[key] = docState[key]
-          changedLabels.push(key)
-        }
-      })
-    )
+    // needs_review lives on the changes table, not the document table.
+    // Detect it separately and pass it to saveRecord; never put it in docChanges.
+    const needsReviewValue = Boolean(docState.needs_review)
+    if (needsReviewValue !== needsReview) {
+      changedLabels.push('needs_review')
+    }
+
+    // All other doc-table fields (current_status and the rest of the sections)
+    ;[
+      ...STATUS_FIELDS.filter(f => f.key !== 'needs_review'),
+      ...DOC_SECTIONS.flatMap(s => s.fields),
+    ].forEach(({ key }) => {
+      if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
+        docChanges[key] = docState[key]
+        changedLabels.push(key)
+      }
+    })
 
     const summary = changedLabels.length
       ? `Updated fields: ${changedLabels.join(', ')}`
       : 'No field changes detected'
 
-    const result = await saveRecord(org.id, doc.id, orgChanges, docChanges, summary)
+    const result = await saveRecord(org.id, doc.id, orgChanges, docChanges, summary, needsReviewValue)
     setSaving(false)
 
     if (result.error) {
       setSaveError(result.error)
     } else {
-      setIsDirty(false)
+      markClean()
       router.refresh()
       setIsEditing(false)
-    }
-  }
-
-  async function handleRequestAnalysis() {
-    setAnalysisLoading(true)
-    setAnalysisError(null)
-    const result = await requestAnalysis(org.name ?? '', analysisUrl, 'reanalyse')
-    setAnalysisLoading(false)
-    if (result.error) {
-      setAnalysisError(result.error)
-    } else {
-      setAnalysisQueued(true)
     }
   }
 
@@ -310,10 +355,11 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
   if (isEditing && canEdit) {
     return (
       <div className="p-8 max-w-4xl">
+
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 mb-6 text-[12px] text-[#64748b] tracking-[0.4px]">
           <button
-            onClick={() => setIsEditing(false)}
+            onClick={() => requestNavigation(() => { markClean(); router.push('/records') })}
             className="flex items-center gap-2 hover:text-slate-700"
           >
             <span className="material-symbols-outlined icon-xs">arrow_left_alt</span>
@@ -324,18 +370,46 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
         </div>
 
         {/* Header card */}
-        <div className="bg-white rounded-xl p-6 flex items-start justify-between mb-4">
+        <div className="bg-white rounded-xl px-6 pt-8 pb-6 flex items-center justify-between mb-4">
           <h1 className="font-poppins font-semibold text-[32px] leading-7 text-black">
             {orgState.name}
           </h1>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={docState.current_status} />
+
+          <div className="flex items-center gap-[14px]">
+            {/* Cancel — always full opacity, styled as a subtle bordered button */}
+            <button
+              onClick={() => requestNavigation(() => exitEditMode())}
+              className="flex items-center gap-1 border-2 border-[#cbd5e1] rounded-[8px] pl-3 pr-4 py-2"
+            >
+              <span className="material-symbols-outlined icon-sm text-[#cbd5e1]">close_small</span>
+              <span className="font-poppins font-semibold text-[14px] leading-5 text-[#cbd5e1]">
+                Cancel
+              </span>
+            </button>
+
+            {/* Analyse — purple, opens the analysis confirmation modal */}
+            <button
+              onClick={() => setShowAnalyseModal(true)}
+              className="flex items-center gap-1 bg-[#6e31af] rounded-[8px] pl-3 pr-4 py-2"
+            >
+              <span className="material-symbols-outlined icon-sm text-white">autoplay</span>
+              <span className="font-poppins font-semibold text-[14px] leading-5 text-white">
+                Analyse
+              </span>
+            </button>
+
+            {/* Save — 40% opacity until a change is made */}
             <button
               onClick={handleSave}
               disabled={!isDirty || saving}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40 transition-colors"
+              className={`flex items-center gap-1 bg-[#2c53ab] rounded-[8px] pl-3 pr-4 py-2 transition-opacity ${
+                isDirty ? 'opacity-100' : 'opacity-40'
+              }`}
             >
-              {saving ? 'Saving…' : 'Save changes'}
+              <span className="material-symbols-outlined icon-sm text-white">save</span>
+              <span className="font-poppins font-semibold text-[14px] leading-5 text-white">
+                {saving ? 'Saving…' : 'Save'}
+              </span>
             </button>
           </div>
         </div>
@@ -345,6 +419,19 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
         )}
 
         <div className="flex flex-col gap-4">
+          {/* Status section */}
+          <EditSection title="Status">
+            {STATUS_FIELDS.map(field => (
+              <EditFieldRow
+                key={field.key}
+                field={field}
+                value={docState[field.key]}
+                onChange={v => updateDoc(field.key, v)}
+              />
+            ))}
+          </EditSection>
+
+          {/* Organisation section */}
           <EditSection title="Organisation">
             {ORG_FIELDS.map(field => (
               <EditFieldRow
@@ -356,6 +443,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             ))}
           </EditSection>
 
+          {/* DPA content sections */}
           {DOC_SECTIONS.map(section => (
             <EditSection key={section.title} title={section.title}>
               {section.fields.map(field => (
@@ -368,37 +456,45 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
               ))}
             </EditSection>
           ))}
+        </div>
 
-          <EditSection title="AI Analysis">
-            <div className="py-3 space-y-3">
-              <p className="text-sm text-slate-500">
-                Queue a re-analysis of this DPA. The analysis will be run against the live document at the URL below.
-              </p>
-              <div className="flex gap-3 items-end">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">DPA URL</label>
-                  <input
-                    type="url"
-                    value={analysisUrl}
-                    onChange={e => setAnalysisUrl(e.target.value)}
-                    className="input"
-                    placeholder="https://..."
-                  />
+        {/* ── Analyse modal ── */}
+        {showAnalyseModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-[8px] w-[540px] max-w-[90vw] px-6 py-12 flex flex-col gap-10">
+              <div className="flex flex-col gap-[26px]">
+                <h2 className="font-poppins font-semibold text-[24px] leading-[28px] text-black">
+                  Analysis request for {orgState.name}
+                </h2>
+                <div className="space-y-4 text-[16px] text-[#475569] leading-[23px]">
+                  <p>
+                    You have requested a re-analysis for this company. By clicking continue, we
+                    will first look for the date of the DPA – if it is different from the date
+                    stored, we will re-examine the rest of the DPA.
+                  </p>
+                  <p>We will let you know when this analysis is complete.</p>
                 </div>
+              </div>
+              <div className="flex gap-[14px] items-center justify-end">
                 <button
-                  onClick={handleRequestAnalysis}
-                  disabled={analysisLoading || analysisQueued}
-                  className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-50 transition-colors"
+                  onClick={() => setShowAnalyseModal(false)}
+                  className="border-2 border-[#1e293b] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-[#1e293b]"
                 >
-                  {analysisLoading ? 'Queuing…' : analysisQueued ? 'Queued ✓' : 'Request analysis'}
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Analysis function not yet implemented — modal closes for now
+                    setShowAnalyseModal(false)
+                  }}
+                  className="bg-[#2c53ab] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-white"
+                >
+                  Yes, continue
                 </button>
               </div>
-              {analysisError && <p className="text-sm text-red-600">{analysisError}</p>}
             </div>
-          </EditSection>
-
-          <ChangeHistory changes={changes} />
-        </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -491,7 +587,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
 function ReadSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl px-6 py-3">
-      {/* Poppins SemiBold 14px, border-b 1.4px #eff2f5 per Figma sidebar_selected style */}
+      {/* Poppins SemiBold 16px, border-b 1.4px #eff2f5 per Figma sidebar_selected style */}
       <div
         className="pt-3 pb-4 flex items-center"
         style={{ borderBottom: '1.4px solid #eff2f5' }}
@@ -525,8 +621,7 @@ function EditSection({ title, children }: { title: string; children: React.React
   )
 }
 
-// Read field row: flex gap-[56px], label w-[272px] text-[#64748b] tracking-[0.4px],
-// value flex-1 text-[#0f172a] — per Figma field row nodes
+// Read field row: flex gap-[56px], label w-[272px] text-[#64748b], value flex-1 text-[#0f172a]
 function ReadFieldRow({
   field,
   org,
@@ -549,6 +644,8 @@ function ReadFieldRow({
   )
 }
 
+// Edit field row: 3-column grid, label col 1, input spans col 2-3.
+// Selects use appearance-none with a custom keyboard_arrow_down icon inside the box.
 function EditFieldRow({
   field,
   value,
@@ -562,11 +659,14 @@ function EditFieldRow({
 
   return (
     <div className="grid grid-cols-3 gap-4 items-start py-2">
-      <label className="text-sm font-medium text-slate-600 pt-2">
+      <label className="text-sm font-medium text-[#45556c] pt-2">
         {field.label}
-        {field.hint && <span className="block text-xs text-slate-400 font-normal">{field.hint}</span>}
+        {field.hint && (
+          <span className="block text-xs text-slate-400 font-normal">{field.hint}</span>
+        )}
       </label>
-      <div className="col-span-2">
+      {/* Wrapper is always relative so the custom select arrow can be absolutely positioned */}
+      <div className="col-span-2 relative">
         {field.type === 'textarea' ? (
           <textarea
             value={displayValue}
@@ -575,26 +675,44 @@ function EditFieldRow({
             className="input resize-y text-sm"
           />
         ) : field.type === 'select' ? (
-          <select
-            value={displayValue}
-            onChange={e => onChange(e.target.value)}
-            className="input text-sm"
-          >
-            <option value="">— select —</option>
-            {field.options?.map(o => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
+          <>
+            <select
+              value={displayValue}
+              onChange={e => onChange(e.target.value)}
+              className="input text-sm appearance-none pr-9"
+            >
+              <option value="">— select —</option>
+              {field.options?.map(o => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined icon-lg absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+              keyboard_arrow_down
+            </span>
+          </>
         ) : field.type === 'boolean' ? (
-          <select
-            value={value === true ? 'true' : value === false ? 'false' : ''}
-            onChange={e => onChange(e.target.value === 'true' ? true : e.target.value === 'false' ? false : null)}
-            className="input text-sm"
-          >
-            <option value="">— select —</option>
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
+          <>
+            <select
+              value={value === true ? 'true' : value === false ? 'false' : ''}
+              onChange={e =>
+                onChange(
+                  e.target.value === 'true'
+                    ? true
+                    : e.target.value === 'false'
+                    ? false
+                    : null,
+                )
+              }
+              className="input text-sm appearance-none pr-9"
+            >
+              <option value="">— select —</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+            <span className="material-symbols-outlined icon-lg absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+              keyboard_arrow_down
+            </span>
+          </>
         ) : (
           <input
             type={field.type}
@@ -622,7 +740,9 @@ function ChangeHistory({ changes }: { changes: AnyRecord[] }) {
               <p className="text-[12px] font-semibold text-[#0f172a] tracking-[0.2px] w-[180px] shrink-0">
                 {change.date_of_review
                   ? new Date(change.date_of_review).toLocaleDateString('en-GB', {
-                      day: 'numeric', month: 'long', year: 'numeric',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
                     })
                   : '—'}
               </p>
