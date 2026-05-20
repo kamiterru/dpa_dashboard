@@ -57,6 +57,29 @@ export default async function RecordPage({ params }: Props) {
   const canEdit = appUser?.role === 'admin' || appUser?.role === 'authorised'
   const needsReview = changes[0]?.needs_review ?? false
 
+  // Check if this org has a pending or processing queue entry (locks editing)
+  const { data: queueEntry } = await supabase
+    .from('analysis_queue')
+    .select('id, analysis_type, requested_by, created_at')
+    .eq('org_id', org.id)
+    .in('status', ['pending', 'processing'])
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  let lockRequestedByName: string | null = null
+  if (queueEntry?.requested_by) {
+    const { data: requester } = await supabase
+      .from('users')
+      .select('first_name')
+      .eq('auth_id', queueEntry.requested_by)
+      .single()
+    lockRequestedByName = requester?.first_name ?? null
+  }
+
+  const isLocked = !!queueEntry
+  const lockAnalysisType = queueEntry?.analysis_type ?? null
+
   return (
     <RecordEditor
       doc={doc}
@@ -65,6 +88,9 @@ export default async function RecordPage({ params }: Props) {
       canEdit={canEdit}
       userRole={appUser?.role ?? 'read_only'}
       needsReview={needsReview}
+      isLocked={isLocked}
+      lockAnalysisType={lockAnalysisType}
+      lockRequestedByName={lockRequestedByName}
     />
   )
 }
