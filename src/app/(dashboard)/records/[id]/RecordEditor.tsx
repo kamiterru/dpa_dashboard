@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { StatusBadge } from '@/components/StatusBadge'
-import { saveRecord } from '@/app/actions/records'
+import { saveRecord, queueAnalysis } from '@/app/actions/records'
 import { useNavGuard } from '@/components/NavigationGuardProvider'
 import type { UserRole } from '@/lib/types'
 
@@ -20,6 +20,9 @@ interface Props {
   canEdit: boolean
   userRole: UserRole
   needsReview: boolean
+  isLocked: boolean
+  lockAnalysisType: string | null
+  lockRequestedByName: string | null
 }
 
 interface FieldDef {
@@ -246,7 +249,7 @@ function ReadValue({ value, type }: { value: unknown; type: string }) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props) {
+export function RecordEditor({ doc, org, changes, canEdit, needsReview, isLocked, lockAnalysisType, lockRequestedByName }: Props) {
   const router = useRouter()
   const { setDirty: setContextDirty, requestNavigation } = useNavGuard()
 
@@ -260,6 +263,8 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
   const [isDirty, setIsDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [queueing, setQueueing] = useState(false)
+  const [queueError, setQueueError] = useState<string | null>(null)
   const [showAnalyseModal, setShowAnalyseModal] = useState(false)
   const [showCheckDateModal, setShowCheckDateModal] = useState(false)
 
@@ -365,6 +370,59 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
       markClean()
       router.refresh()
       setIsEditing(false)
+    }
+  }
+
+  // ── Queue analysis ────────────────────────────────────────────────────────
+
+  async function handleQueue(analysisType: 'reanalyse' | 'hard_reanalyse') {
+    setQueueing(true)
+    setQueueError(null)
+
+    // Collect any pending changes to save before queuing
+    const orgChanges: AnyRecord = {}
+    const docChanges: AnyRecord = {}
+
+    ORG_FIELDS.forEach(({ key }) => {
+      if (JSON.stringify(orgState[key]) !== JSON.stringify(org[key])) {
+        orgChanges[key] = orgState[key]
+      }
+    })
+    STATUS_FIELDS.filter(f => f.source === 'org').forEach(({ key }) => {
+      if (JSON.stringify(orgState[key]) !== JSON.stringify(org[key])) {
+        orgChanges[key] = orgState[key]
+      }
+    })
+    ;[
+      ...STATUS_FIELDS.filter(f => f.key !== 'needs_review' && f.source !== 'org'),
+      ...DOC_SECTIONS.flatMap(s => s.fields),
+    ].forEach(({ key }) => {
+      if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
+        docChanges[key] = docState[key]
+      }
+    })
+
+    const result = await queueAnalysis(
+      org.id,
+      doc.id,
+      org.name,
+      org.url_link ?? '',
+      analysisType,
+      orgChanges,
+      docChanges,
+      Boolean(docState.needs_review),
+    )
+
+    setQueueing(false)
+
+    if (result.error) {
+      setQueueError(result.error)
+    } else {
+      markClean()
+      setIsEditing(false)
+      setShowAnalyseModal(false)
+      setShowCheckDateModal(false)
+      router.refresh()
     }
   }
 
@@ -486,19 +544,27 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
           ))}
         </div>
 
+        {queueError && (
+          <div className="mb-4 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-2">{queueError}</div>
+        )}
+
         {/* ── Re-analyse modal ── */}
         {showAnalyseModal && (
           <ConfirmModal
             title={`Analysis request for ${orgState.name}`}
             onCancel={() => setShowAnalyseModal(false)}
-            onConfirm={() => setShowAnalyseModal(false) /* TODO: wire up analysis */}
+            onConfirm={() => handleQueue('hard_reanalyse')}
+            confirming={queueing}
           >
             <p>
               You have requested a re-analysis for this company. By clicking continue, we will
               perform a full analysis for this company which may replace existing wording in
               the analysis.
             </p>
-            <p>We will let you know when this analysis is complete.</p>
+            <p>
+              {isDirty ? 'Any unsaved edits will be saved before the analysis begins. ' : ''}
+              You will receive an email when the analysis is complete.
+            </p>
           </ConfirmModal>
         )}
 
@@ -507,7 +573,8 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
           <ConfirmModal
             title={`Check Date for ${orgState.name}`}
             onCancel={() => setShowCheckDateModal(false)}
-            onConfirm={() => setShowCheckDateModal(false) /* TODO: wire up date check */}
+            onConfirm={() => handleQueue('reanalyse')}
+            confirming={queueing}
           >
             <p>
               By clicking continue, we will check the date of the DPA for this company – if
@@ -515,6 +582,9 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
               This is normally done on a weekly basis anyway, but you can make it happen now
               if you need.
             </p>
+            {isDirty && (
+              <p>Any unsaved edits will be saved before the check begins.</p>
+            )}
           </ConfirmModal>
         )}
       </div>
@@ -571,15 +641,42 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview }: Props)
             <StatusBadge status={doc.current_status} />
             {canEdit && (
               <button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center justify-center hover:opacity-70 transition-opacity text-slate-400"
-                title="Edit record"
+                onClick={() => { if (!isLocked) setIsEditing(true) }}
+                disabled={isLocked}
+                className={`flex items-center justify-center transition-opacity ${
+                  isLocked
+                    ? 'opacity-30 cursor-not-allowed text-slate-400'
+                    : 'hover:opacity-70 text-slate-400'
+                }`}
+                title={isLocked ? 'Record is locked while analysis is in progress' : 'Edit record'}
               >
                 <span className="material-symbols-outlined icon-sm">edit</span>
               </button>
             )}
           </div>
         </div>
+
+        {/* Locked banner — shown while an analysis is queued or in progress */}
+        {isLocked && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-6 py-4 flex items-start gap-3">
+            <span className="material-symbols-outlined icon-filled text-amber-500 shrink-0 mt-0.5" style={{ fontSize: 20 }}>
+              lock
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">
+                Analysis in progress — editing is locked
+              </p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                {lockAnalysisType === 'hard_reanalyse'
+                  ? 'A full re-analysis'
+                  : 'A DPA date check'}
+                {' '}has been queued
+                {lockRequestedByName ? ` by ${lockRequestedByName}` : ''}.
+                {' '}This record will be unlocked automatically once the analysis completes.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Organisation card */}
         <ReadSection title="Organisation">
@@ -774,11 +871,13 @@ function ConfirmModal({
   children,
   onCancel,
   onConfirm,
+  confirming = false,
 }: {
   title: string
   children: React.ReactNode
   onCancel: () => void
   onConfirm: () => void
+  confirming?: boolean
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -794,15 +893,17 @@ function ConfirmModal({
         <div className="flex gap-[14px] items-center justify-end">
           <button
             onClick={onCancel}
-            className="border-2 border-[#1e293b] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-[#1e293b]"
+            disabled={confirming}
+            className="border-2 border-[#1e293b] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-[#1e293b] disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="bg-[#2c53ab] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-white"
+            disabled={confirming}
+            className="bg-[#2c53ab] rounded-[8px] px-4 py-2 font-poppins font-semibold text-[14px] leading-5 text-white disabled:opacity-60"
           >
-            Yes, continue
+            {confirming ? 'Queuing…' : 'Yes, continue'}
           </button>
         </div>
       </div>
