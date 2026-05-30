@@ -67,6 +67,11 @@ const ORG_FIELDS: FieldDef[] = [
   { key: 'include_entity',      label: 'DPA covers subsidiaries?', type: 'boolean' },
 ]
 
+// Summary section — at_a_glance renders full-width with no label column
+const SUMMARY_FIELDS: FieldDef[] = [
+  { key: 'at_a_glance', label: 'At a glance', type: 'textarea' },
+]
+
 // current_status has been moved to STATUS_FIELDS; no longer in DPA Overview
 const DOC_SECTIONS: { title: string; fields: FieldDef[] }[] = [
   {
@@ -85,6 +90,13 @@ const DOC_SECTIONS: { title: string; fields: FieldDef[] }[] = [
       { key: 'transfer_out_choice', label: 'Transfers outside EEA / UK allowed?',  type: 'select', options: ['Yes', 'No', 'With consent'] },
       { key: 'SSC_in_place',        label: 'Are SCCs in place?',                   type: 'select', options: ['Yes', 'No', 'Unclear'] },
       { key: 'SSC_summary',         label: 'SCC Summary',                          type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Non-Processor Data Use',
+    fields: [
+      { key: 'sole_processor',         label: 'Does the company process data solely as a processor?', type: 'select', options: ['Yes', 'No', 'Unclear'] },
+      { key: 'sole_processor_details', label: 'Details of non-processor data use',                               type: 'textarea' },
     ],
   },
   {
@@ -158,6 +170,13 @@ const READ_DOC_SECTIONS: { title: string; fields: ReadFieldDef[] }[] = [
       { key: 'transfer_out_choice', label: 'Transfers outside EEA / UK allowed?',  type: 'select' },
       { key: 'SSC_in_place',        label: 'Are SCCs in place?',                   type: 'select' },
       { key: 'SSC_summary',         label: 'SCC Summary',                          type: 'textarea' },
+    ],
+  },
+  {
+    title: 'Non-Processor Data Use',
+    fields: [
+      { key: 'sole_processor',         label: 'Does the company process data solely as a processor?', type: 'select' },
+      { key: 'sole_processor_details', label: 'Details of non-processor data use',                               type: 'textarea' },
     ],
   },
   {
@@ -346,9 +365,10 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview, isLocked
     }
 
     // Doc-table fields: STATUS fields that are not needs_review and not org-sourced,
-    // plus all the section fields.
+    // plus all the section fields and the summary field.
     ;[
       ...STATUS_FIELDS.filter(f => f.key !== 'needs_review' && f.source !== 'org'),
+      ...SUMMARY_FIELDS,
       ...DOC_SECTIONS.flatMap(s => s.fields),
     ].forEach(({ key }) => {
       if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
@@ -395,6 +415,7 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview, isLocked
     })
     ;[
       ...STATUS_FIELDS.filter(f => f.key !== 'needs_review' && f.source !== 'org'),
+      ...SUMMARY_FIELDS,
       ...DOC_SECTIONS.flatMap(s => s.fields),
     ].forEach(({ key }) => {
       if (JSON.stringify(docState[key]) !== JSON.stringify(doc[key])) {
@@ -515,6 +536,18 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview, isLocked
                 }
               />
             ))}
+          </EditSection>
+
+          {/* Summary section — full-width, no label column */}
+          <EditSection title="Summary">
+            <div className="py-2">
+              <textarea
+                value={docState.at_a_glance ?? ''}
+                onChange={e => updateDoc('at_a_glance', e.target.value)}
+                rows={5}
+                className="input resize-y text-sm w-full"
+              />
+            </div>
           </EditSection>
 
           {/* Organisation section */}
@@ -677,6 +710,16 @@ export function RecordEditor({ doc, org, changes, canEdit, needsReview, isLocked
             </div>
           </div>
         )}
+
+        {/* Summary card — at_a_glance spans full width, no label column */}
+        <ReadSection title="Summary">
+          <div className="py-3">
+            {doc.at_a_glance
+              ? <p className="text-sm text-[#0f172a] leading-6 whitespace-pre-wrap">{doc.at_a_glance}</p>
+              : <span className="text-sm text-slate-300">—</span>
+            }
+          </div>
+        </ReadSection>
 
         {/* Organisation card */}
         <ReadSection title="Organisation">
