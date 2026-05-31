@@ -47,7 +47,7 @@ const STATUS_FIELDS: FieldDef[] = [
     key: 'current_status',
     label: 'Current Status',
     type: 'select',
-    options: ['Compliant', 'Not Compliant', 'Unclear', 'Not Assessed', 'Failed'],
+    options: ['GDPR Addressed', 'Data Use Review', 'Needs Review', 'Gaps Identified', 'Not Assessed', 'Failed'],
   },
   { key: 'needs_review', label: 'Needs Review', type: 'boolean' },
   // published lives in org_entity — source: 'org' routes it to orgState / updateOrg
