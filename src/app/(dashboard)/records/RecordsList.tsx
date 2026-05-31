@@ -16,6 +16,7 @@ interface QueueRow {
   analysis_type: string | null
   status: string | null
   created_at: string | null
+  requested_by_name: string | null
 }
 
 interface Props {
@@ -106,18 +107,23 @@ export function RecordsList({ records, filter, canWrite, title = 'All Records', 
       <div className="p-8">
         <PageHeader title="Requested" canWrite={false} />
         <div className="bg-white rounded-[8px] border border-[#e6e8eb] overflow-hidden shadow-sm">
-          <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr] border-b border-[#f8fafc] bg-[#f8fafc] px-6 py-3">
-            {['COMPANY', 'URL', 'TYPE', 'STATUS', 'REQUESTED'].map(h => (
+          <div className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr] border-b border-[#f8fafc] bg-[#f8fafc] px-6 py-3">
+            {['COMPANY', 'URL', 'TYPE', 'STATUS', 'REQUESTED BY', 'DATE'].map(h => (
               <span key={h} className="font-poppins text-xs font-semibold text-[#64748b] uppercase tracking-wider">{h}</span>
             ))}
           </div>
-          {!queue.length && <EmptyRow cols={5} />}
+          {!queue.length && <EmptyRow cols={6} message="No pending or in-progress analyses" />}
           {queue.map(row => (
-            <div key={row.id} className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr] px-6 py-4 border-b border-[#f8fafc] bg-white">
+            <div key={row.id} className="grid grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr] px-6 py-4 border-b border-[#f8fafc] bg-white items-center">
               <span className="font-inter text-sm font-medium text-[#090909]">{row.company_name}</span>
               <span className="font-inter text-sm text-[#536072] truncate">{row.company_url ?? '—'}</span>
-              <span className="font-inter text-sm text-[#536072] capitalize">{row.analysis_type?.replace('_', ' ')}</span>
-              <StatusBadge status={row.status} />
+              <span className="font-inter text-sm text-[#536072] capitalize">{row.analysis_type?.replace(/_/g, ' ')}</span>
+              <span className={`font-inter text-sm font-medium capitalize ${
+                row.status === 'processing' ? 'text-[#2c53ab]' : 'text-[#64748b]'
+              }`}>
+                {row.status}
+              </span>
+              <span className="font-inter text-sm text-[#536072]">{row.requested_by_name ?? '—'}</span>
               <span className="font-inter text-sm text-[#64748b]">{fmt(row.created_at)}</span>
             </div>
           ))}

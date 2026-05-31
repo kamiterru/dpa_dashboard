@@ -34,19 +34,41 @@ export default async function RecordsPage({ searchParams }: Props) {
 
   const canWrite = appUser?.role === 'admin' || appUser?.role === 'authorised'
 
-  // Requested tab — show analysis queue
+  // Requested tab — show only pending/processing items from the analysis queue
   if (filter === 'requested') {
     const { data: queue } = await supabase
       .from('analysis_queue')
-      .select('id, company_name, company_url, analysis_type, status, created_at')
+      .select('id, company_name, company_url, analysis_type, status, created_at, requested_by')
+      .in('status', ['pending', 'processing'])
       .order('created_at', { ascending: false })
+
+    // Resolve requester names from public.users via auth_id
+    const requesterIds = [...new Set((queue ?? []).map(r => r.requested_by).filter(Boolean))]
+    let userMap: Record<string, string> = {}
+    if (requesterIds.length) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('auth_id, first_name, last_name')
+        .in('auth_id', requesterIds)
+      userMap = Object.fromEntries(
+        (users ?? []).map(u => [
+          u.auth_id,
+          [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Unknown',
+        ])
+      )
+    }
+
+    const enrichedQueue = (queue ?? []).map(row => ({
+      ...row,
+      requested_by_name: row.requested_by ? (userMap[row.requested_by] ?? 'Unknown') : null,
+    }))
 
     return (
       <RecordsList
         records={[]}
         filter="requested"
         canWrite={canWrite}
-        queue={queue ?? []}
+        queue={enrichedQueue}
       />
     )
   }
